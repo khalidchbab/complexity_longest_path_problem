@@ -11,6 +11,7 @@ def read_data(filePath, mode):
     numNodes = int(line)
     graph = [ [0]*numNodes for i in range(numNodes)]
     edges = []
+    # Last line is an empty string.
     while line != ['']:
          line = file.readline().strip().split(" ")
          try:
@@ -23,6 +24,7 @@ def read_data(filePath, mode):
                 edges.append((src,dest,weight))
                 edges.append((dest,src,weight))
          except ValueError:
+            # Last line.
             break
     return (numNodes, graph,edges)
 
@@ -52,73 +54,54 @@ def objectif_func(list,weights):
         tmp.append(weights[t][t_1])
     return sum(tmp)
 
-def search(n,d,t,solutions,file):
-    if n < 2:
-        return solutions
-    print(n)
+def main():
     model = cp_model.CpModel()
 
-    n_n,data,edges = read_data(file,'r+')
+    n,data,edges = read_data("graph",'r+')
+    print(edges)
     data_flat = list(chain.from_iterable(data))
     min_w = min(data_flat)
     max_w = max(data_flat)
     vars = []
     weights = []
-    vars.append(model.NewIntVar(d,d,"s"))
-    for i in range(n-2):
+
+    for i in range(n):
         vars.append(model.NewIntVar( 0, n-1, "a"+str(i)))
-    vars.append(model.NewIntVar(t,t,"t"))
     model.AddAllDifferent(vars)
     for i in range(n-1):
         weights.append(model.NewIntVar(min_w,max_w,"w"+str(1)))
     model.AddAllDifferent(weights)
     for i in range(n-1):
         model.AddAllowedAssignments( (vars[i],vars[i+1],weights[i]), edges)
+
     model.Maximize(sum(weights))
 
+    # model.Maximize(objectif_func(vars,data))
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
-
-    rr = solver.ObjectiveValue()
     s = 0
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         for w in weights:
             s = s + solver.Value(w)
-        solutions.append(([solver.Value(vars[i]) for i in range(n)],[solver.Value(weights[i]) for i in range(n-1)],s))
-        if n < 2:
-            return solutions
-        else :
-            return search(n-1,d,t,solutions,file)
+        print(s)
     else:
-        if n < 2:
-            return solutions
+        print('No solution found.')
+
+    solver.ObjectiveValue()
+    for i in range(n):
+        if i < n-1:
+            print(solver.Value(vars[i]),"-",solver.Value(weights[i]),"->",end=" ")
         else :
-            return search(n-1,d,t,solutions,file)
+            print(solver.Value(vars[i]))
+
     print('\n')
-
-def find_solution(solutions):
-    m = 0
-    path_f = []
-    weight_f = []
-    for path,weight,w in solutions:
-        if w > m:
-            m = w
-            path_f = path
-            weight_f = weight
-    return path_f,weight_f,m
-
-def print_result(path,weights,w):
-    print(f"the weight of the path is : {w} and it's degree is : {len(path)}")
-    for i in range(len(path)-1):
-        print(f"{path[i]} --({weights[i]})-->",end=" ")
-    print(path[-1])
-
-def main(d,t,file):
-    solutions = []
-    n,data,edges = read_data(file,'r+')
-    solutions = search(n,d,t,solutions,file)
-    path,weights,w = find_solution(solutions)
-    print_result(path,weights,w)
+    s = 0
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        for w in weights:
+            s = s + solver.Value(w)
+        print(s)
+    else:
+        print('No solution found.')
 
 if __name__ == '__main__':
-    main(0,2,"graph4")
+    main()
